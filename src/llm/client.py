@@ -15,11 +15,13 @@ class OpenAICompatibleClient(BaseLLMClient):
         api_key: Optional[str] = None,
         model: str = "gpt-4o-mini",
         timeout: float = 60.0,
+        extra_headers: Optional[Dict[str, str]] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key or "sk-dummy-key-for-local-vllm"
         self.model = model
         self.timeout = timeout
+        self.extra_headers = extra_headers or {}
 
     async def chat(
         self,
@@ -32,6 +34,8 @@ class OpenAICompatibleClient(BaseLLMClient):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.extra_headers:
+            headers.update(self.extra_headers)
 
         # Format payload
         payload_messages = []
@@ -357,6 +361,21 @@ def create_llm_client(cfg: Settings) -> BaseLLMClient:
             base_url=cfg.vllm_base_url,
             api_key="vllm-local",
             model=cfg.vllm_model,
+        )
+    elif provider == "openrouter":
+        base_url = (
+            "https://openrouter.ai/api/v1"
+            if cfg.openai_base_url == "https://api.openai.com/v1"
+            else cfg.openai_base_url
+        )
+        return OpenAICompatibleClient(
+            base_url=base_url,
+            api_key=cfg.openai_api_key or "sk-or-dummy",
+            model=cfg.openai_model,
+            extra_headers={
+                "HTTP-Referer": cfg.openrouter_site_url,
+                "X-Title": cfg.openrouter_app_name,
+            },
         )
     elif provider in ("openai", "groq"):
         return OpenAICompatibleClient(

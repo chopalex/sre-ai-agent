@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # 1. LLM Provider configuration
-    llm_provider: Literal["ollama", "vllm", "openai", "groq", "mock"] = "mock"
+    llm_provider: Literal["ollama", "vllm", "openai", "groq", "openrouter", "mock"] = "mock"
 
     # Ollama settings
     ollama_base_url: str = "http://localhost:11434"
@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
+    openrouter_site_url: str = "https://github.com/chopalex/sre-ai-agent"
+    openrouter_app_name: str = "SRE AI Agent"
 
     # 2. Security & Guardrails
     security_enabled: bool = True

@@ -57,3 +57,21 @@ async def test_agent_full_loop_and_citations(agent_suite):
     assert audit_file.exists()
     lines = audit_file.read_text(encoding="utf-8").splitlines()
     assert len(lines) >= 3
+
+
+def test_openrouter_client_factory():
+    from src.config import Settings
+    from src.llm.client import create_llm_client, OpenAICompatibleClient
+
+    cfg = Settings(
+        llm_provider="openrouter",
+        openai_api_key="sk-or-test-key",
+        openai_model="meta-llama/llama-3.3-70b-instruct",
+    )
+    client = create_llm_client(cfg)
+    assert isinstance(client, OpenAICompatibleClient)
+    assert client.base_url == "https://openrouter.ai/api/v1"
+    assert client.api_key == "sk-or-test-key"
+    assert client.model == "meta-llama/llama-3.3-70b-instruct"
+    assert "HTTP-Referer" in client.extra_headers
+    assert "X-Title" in client.extra_headers

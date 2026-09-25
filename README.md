@@ -99,14 +99,15 @@ docker compose up -d
 docker exec -it sre-ollama ollama run qwen2.5-coder:1.5b
 ```
 
-### Вариант 3: Облачный API (Groq / DeepSeek / OpenAI)
-Для моментального сверхбыстрого отклика (~300 токенов/сек):
+### Вариант 3: Облачный API (OpenRouter / Groq / OpenAI)
+Для доступа к 500+ моделям через единый шлюз [OpenRouter](https://openrouter.ai/) или сверхбыстрый Groq:
 ```bash
 # В .env указать:
-LLM_PROVIDER=groq  # или openai
-OPENAI_API_KEY=ваш_ключ
-OPENAI_BASE_URL=https://api.groq.com/openai/v1
-OPENAI_MODEL=llama-3.3-70b-versatile
+LLM_PROVIDER=openrouter
+OPENAI_API_KEY=sk-or-v1-ваш_ключ_от_openrouter
+OPENAI_MODEL=meta-llama/llama-3.3-70b-instruct
+# Или qwen/qwen-2.5-coder-32b-instruct, anthropic/claude-3.5-haiku, deepseek/deepseek-chat
+```
 ```
 
 ### Вариант 4: Сервер с NVIDIA GPU (CUDA Acceleration)
