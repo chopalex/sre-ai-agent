@@ -51,11 +51,52 @@ class AgentLoop:
             step_start = time.perf_counter()
 
             # 1. Reason: LLM invocation
-            llm_resp: LLMResponse = await self.llm.chat(
-                messages=messages,
-                tools=self.tools_schema,
-            )
-            last_model = llm_resp.model
+            try:
+                llm_resp: LLMResponse = await self.llm.chat(
+                    messages=messages,
+                    tools=self.tools_schema,
+                )
+                last_model = llm_resp.model
+            except Exception as exc:
+                err_msg = str(exc)
+                if "429" in err_msg and ("free-models-per-day" in err_msg or "Rate limit exceeded" in err_msg):
+                    friendly_err = (
+                        "### ⚠️ Превышен дневной лимит бесплатных запросов OpenRouter (50 запросов в сутки)\n\n"
+                        "На вашем аккаунте OpenRouter исчерпан лимит бесплатных моделей на сегодня.\n\n"
+                        "**Как продолжить работу:**\n"
+                        "1. **Использовать бесплатный Groq (без лимита 50/день):**\n"
+                        "   - Получите бесплатный ключ на [console.groq.com](https://console.groq.com)\n"
+                        "   - В `.env` укажите: `LLM_PROVIDER=groq`, `OPENAI_API_KEY=gsk_...`\n"
+                        "2. **Переключиться в Mock-режим (для проверки логики агента без интернета):**\n"
+                        "   - В `.env` укажите: `LLM_PROVIDER=mock`\n"
+                        "3. **Пополнить OpenRouter ($5):**\n"
+                        "   - Разблокирует 1000 бесплатных запросов в сутки + доступ к Claude / Qwen / DeepSeek\n"
+                        "4. **Дождаться сброса суточного счетчика OpenRouter** (сбрасывается раз в сутки)."
+                    )
+                else:
+                    friendly_err = f"### ⚠️ Ошибка вызова LLM API\n\n```text\n{err_msg}\n```"
+
+                self.audit.log(
+                    sess_id,
+                    step=current_step,
+                    event_type="error",
+                    data={"error": err_msg},
+                )
+
+                total_elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                return AgentRunResult(
+                    session_id=sess_id,
+                    query=query,
+                    final_answer=friendly_err,
+                    steps=steps,
+                    citations=citations,
+                    success=False,
+                    llm_model=last_model,
+                    llm_provider=type(self.llm).__name__,
+                    total_duration_ms=total_elapsed_ms,
+                    total_prompt_tokens=total_prompt_tokens,
+                    total_completion_tokens=total_completion_tokens,
+                )
 
             total_prompt_tokens += llm_resp.prompt_tokens
             total_completion_tokens += llm_resp.completion_tokens

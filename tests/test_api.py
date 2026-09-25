@@ -1,11 +1,14 @@
 from fastapi.testclient import TestClient
 import pytest
 from src.api.app import app
+from src.llm.client import MockLLMClient
 
 
 @pytest.fixture
 def client():
     with TestClient(app) as c:
+        # Ensure offline mock LLM during testing
+        c.app.state.agent.llm = MockLLMClient()
         yield c
 
 

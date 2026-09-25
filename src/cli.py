@@ -101,7 +101,9 @@ async def run_query(agent: AgentLoop, query: str):
         console.print(Panel(citations_text, title="[bold blue]Использованные цитаты из Runbooks[/bold blue]", border_style="blue"))
 
     # Render final answer
-    console.print(Panel(Markdown(res.final_answer), title="[bold green]Итоговое заключение SRE Агента[/bold green]", border_style="green"))
+    box_title = "[bold green]Итоговое заключение SRE Агента[/bold green]" if res.success else "[bold red]Предупреждение / Ошибка[/bold red]"
+    box_style = "green" if res.success else "red"
+    console.print(Panel(Markdown(res.final_answer), title=box_title, border_style=box_style))
     console.print(
         f"[dim]📡 Провайдер: [bold cyan]{res.llm_provider}[/bold cyan] | "
         f"Модель: [bold magenta]{res.llm_model}[/bold magenta] | "
