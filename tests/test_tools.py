@@ -22,6 +22,14 @@ async def test_system_diag_disk(executor):
 
 
 @pytest.mark.asyncio
+async def test_system_diag_cpu(executor):
+    tool = SystemDiagTool(executor=executor)
+    res = await tool.execute(target="cpu")
+    assert res.success is True
+    assert "CPU" in res.output or "Utilization" in res.output
+
+
+@pytest.mark.asyncio
 async def test_safe_bash_tool_allowed(executor):
     tool = SafeBashTool(executor=executor)
     res = await tool.execute(command="echo 'ops_healthcheck'")

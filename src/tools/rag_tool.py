@@ -50,12 +50,20 @@ class RunbookSearchTool(BaseTool):
         elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
 
         has_results = len(rag_ctx.results) > 0
+        if has_results:
+            output = rag_ctx.formatted_context
+        else:
+            output = (
+                f"По запросу '{query}' специфических регламентов в базе знаний не найдено.\n"
+                "Рекомендуется использовать инструмент системной диагностики `system_diagnostic` "
+                "или `execute_bash` для сбора фактических метрик с сервера."
+            )
 
         return ToolResult(
             tool_name=self.name,
-            success=has_results,
-            output=rag_ctx.formatted_context,
-            error=None if has_results else "No relevant runbooks matched query.",
+            success=True,
+            output=output,
+            error=None,
             duration_ms=elapsed_ms,
             metadata={
                 "citations": rag_ctx.citations,

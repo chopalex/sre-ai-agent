@@ -17,6 +17,20 @@ class ExecutionResult(BaseModel):
     security: SecurityResult
 
 
+def _decode_bytes(raw_bytes: bytes) -> str:
+    if not raw_bytes:
+        return ""
+    if sys.platform == "win32":
+        # Windows console commands (cmd.exe) usually emit OEM CP866 or CP1251
+        for enc in ("utf-8", "cp866", "cp1251"):
+            try:
+                return raw_bytes.decode(enc)
+            except UnicodeDecodeError:
+                continue
+        return raw_bytes.decode("utf-8", errors="replace")
+    return raw_bytes.decode("utf-8", errors="replace")
+
+
 class SafeCommandExecutor:
     """Safely executes validated system commands with time and memory boundaries."""
 
@@ -86,8 +100,8 @@ class SafeCommandExecutor:
                 exit_code = proc.returncode if proc.returncode is not None else -1
 
                 # Decode and truncate to max output bytes
-                stdout_text = stdout_data[: self.max_output_bytes].decode("utf-8", errors="replace")
-                stderr_text = stderr_data[: self.max_output_bytes].decode("utf-8", errors="replace")
+                stdout_text = _decode_bytes(stdout_data[: self.max_output_bytes])
+                stderr_text = _decode_bytes(stderr_data[: self.max_output_bytes])
 
             except asyncio.TimeoutError:
                 timed_out = True

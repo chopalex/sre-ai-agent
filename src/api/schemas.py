@@ -50,7 +50,7 @@ class CommandValidateResponse(BaseModel):
 
 
 class DirectDiagRequest(BaseModel):
-    target: str = Field("disk", pattern="^(disk|memory|process|network)$")
+    target: str = Field("cpu", pattern="^(cpu|disk|memory|process|network)$")
     path: str = "/"
 
 
