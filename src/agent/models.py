@@ -20,6 +20,8 @@ class AgentRunResult(BaseModel):
     steps: List[AgentStep] = Field(default_factory=list)
     citations: List[str] = Field(default_factory=list)
     success: bool = True
+    llm_model: str = "unknown"
+    llm_provider: str = "unknown"
     total_duration_ms: float = 0.0
     total_prompt_tokens: int = 0
     total_completion_tokens: int = 0

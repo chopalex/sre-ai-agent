@@ -102,7 +102,106 @@ async def run_query(agent: AgentLoop, query: str):
 
     # Render final answer
     console.print(Panel(Markdown(res.final_answer), title="[bold green]Итоговое заключение SRE Агента[/bold green]", border_style="green"))
-    console.print(f"[dim]Общее время: {res.total_duration_ms} мс | Сессия: {res.session_id}[/dim]\n")
+    console.print(
+        f"[dim]📡 Провайдер: [bold cyan]{res.llm_provider}[/bold cyan] | "
+        f"Модель: [bold magenta]{res.llm_model}[/bold magenta] | "
+        f"Токены: {res.total_prompt_tokens} in / {res.total_completion_tokens} out | "
+        f"Время: {res.total_duration_ms} мс | Сессия: {res.session_id}[/dim]\n"
+    )
+
+
+async def run_check():
+    """Diagnostic check of LLM provider and OpenRouter connection."""
+    import httpx
+
+    console.print("\n[bold cyan]=== Диагностика подключения к LLM ===[/bold cyan]\n")
+    console.print(f"[dim]• Конфигурация:[/dim] LLM_PROVIDER = [yellow]{settings.llm_provider}[/yellow]")
+    console.print(f"[dim]• Базовый URL:[/dim]  {settings.openai_base_url}")
+    console.print(f"[dim]• Целевая модель:[/dim] [bold]{settings.openai_model}[/bold]")
+
+    if settings.llm_provider == "mock":
+        console.print("\n[yellow]⚠️ Внимание:[/yellow] Активен режим [bold]MOCK[/bold] (локальная заглушка).")
+        console.print("Запросы к внешним API не выполняются. Чтобы включить OpenRouter, укажите в `.env`:")
+        console.print("  [green]LLM_PROVIDER=openrouter[/green]")
+        console.print("  [green]OPENAI_API_KEY=sk-or-v1-...[/green]\n")
+        return
+
+    if settings.llm_provider == "openrouter":
+        key = settings.openai_api_key or ""
+        masked_key = key[:10] + "..." + key[-4:] if len(key) > 16 else "НЕ_УКАЗАН"
+        console.print(f"[dim]• API Ключ:[/dim]     {masked_key}")
+
+        if not key or "sk-or-v1-" not in key:
+            console.print("[red]❌ Ошибка:[/red] Укажите валидный ключ OpenRouter (начинается с 'sk-or-v1-') в файле .env")
+            return
+
+        with console.status("[bold green]1/2 Проверка авторизации на openrouter.ai...[/bold green]"):
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    auth_resp = await client.get(
+                        "https://openrouter.ai/api/v1/auth/key",
+                        headers={"Authorization": f"Bearer {key}"},
+                    )
+            except Exception as e:
+                console.print(f"[red]❌ Ошибка соединения:[/red] {e}")
+                return
+
+        if auth_resp.status_code == 200:
+            kdata = auth_resp.json().get("data", {})
+            free_limits = kdata.get("free_model_daily_requests", {})
+            console.print(f"[green]✓ Авторизация успешна:[/green] аккаунт активен")
+            if free_limits:
+                console.print(
+                    f"  [cyan]Лимит бесплатных запросов:[/cyan] {free_limits.get('remaining', '?')}/{free_limits.get('limit', '?')} в сутки"
+                )
+        else:
+            console.print(f"[red]❌ Ошибка авторизации ({auth_resp.status_code}):[/red] {auth_resp.text}")
+            return
+
+        with console.status(f"[bold green]2/2 Тестовый запрос к модели {settings.openai_model}...[/bold green]"):
+            payload = {
+                "model": settings.openai_model,
+                "messages": [{"role": "user", "content": "Привет! Ответь одним словом: 'РАБОТАЕТ'"}],
+                "temperature": 0.1,
+            }
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "HTTP-Referer": settings.openrouter_site_url,
+                "X-Title": settings.openrouter_app_name,
+            }
+            try:
+                import time
+                t0 = time.perf_counter()
+                async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=8.0)) as client:
+                    chat_resp = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        json=payload,
+                        headers=headers,
+                    )
+                dt = round((time.perf_counter() - t0) * 1000, 2)
+            except Exception as e:
+                console.print(f"[red]❌ Ошибка отправки запроса:[/red] {e}")
+                return
+
+        if chat_resp.status_code == 200:
+            data = chat_resp.json()
+            returned_model = data.get("model", settings.openai_model)
+            reply = data["choices"][0]["message"]["content"].strip()
+            console.print(f"[green]✓ Успешный ответ от OpenRouter ({dt} мс)![/green]")
+            console.print(f"  [dim]• Модель в ответе:[/dim] [bold magenta]{returned_model}[/bold magenta]")
+            console.print(f"  [dim]• Текст ответа:[/dim]    [bold]{reply}[/bold]")
+            console.print(f"\n[green]Все проверки пройдены! Агент готов к реальным запросам.[/green]")
+            console.print(f"[dim]Журнал активности в реальном времени:[/dim] https://openrouter.ai/activity\n")
+        elif chat_resp.status_code == 429:
+            err = chat_resp.json().get("error", {}).get("message", chat_resp.text)
+            console.print(f"[yellow]⚠️ Модель перегружена (HTTP 429):[/yellow] {err}")
+            console.print("  [dim]Совет: бесплатный пул этой модели сейчас занят. Попробуйте модель из стабильного списка:[/dim]")
+            console.print("  • [cyan]cohere/north-mini-code:free[/cyan]")
+            console.print("  • [cyan]liquid/lfm-2.5-2.6b:free[/cyan]")
+            console.print("  • [cyan]nvidia/nemotron-3.5-lightning:free[/cyan]")
+            console.print("  • [cyan]qwen/qwen-2.5-coder-32b-instruct[/cyan] (платная, копеечная цена)")
+        else:
+            console.print(f"[red]❌ Модель вернула ошибку {chat_resp.status_code}:[/red] {chat_resp.text}")
 
 
 def print_banner(rag: RAGPipeline):
@@ -110,12 +209,16 @@ def print_banner(rag: RAGPipeline):
 [dim]• Провайдер LLM:[/dim] [yellow]{settings.llm_provider}[/yellow] ({settings.ollama_model if settings.llm_provider=='ollama' else settings.openai_model})
 [dim]• Режим безопасности:[/dim] [green]{'ВКЛЮЧЕН (AST/Regex Guardrails)' if settings.security_enabled else 'ОТКЛЮЧЕН'}[/green]
 [dim]• Индексировано ранбуков:[/dim] [bold]{len(rag.store.chunks)} секций[/bold] из [dim]{settings.docs_dir}[/dim]
-[dim]• Команды: 'exit' для выхода, или введите инцидент (напр. 'Заканчивается диск', 'nginx 502', 'rm -rf /')[/dim]
+[dim]• Команды: 'exit' для выхода, '--check' для проверки связи с API, или введите инцидент[/dim]
 """
     console.print(Panel(banner, border_style="cyan"))
 
 
 async def main_async():
+    if "--check" in sys.argv or "-c" in sys.argv:
+        await run_check()
+        return
+
     agent, rag = create_agent()
 
     if len(sys.argv) > 1:
@@ -133,6 +236,9 @@ async def main_async():
             if query.lower() in ("exit", "quit", "q"):
                 console.print("[dim]Выход.[/dim]")
                 break
+            if query.lower() in ("--check", "check"):
+                await run_check()
+                continue
             await run_query(agent, query)
         except (KeyboardInterrupt, EOFError):
             console.print("\n[dim]Сессия завершена.[/dim]")

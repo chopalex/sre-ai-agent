@@ -14,6 +14,7 @@ class ChatMessage(BaseModel):
     content: str
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
+    tool_call_id: Optional[str] = None
 
 
 class LLMResponse(BaseModel):

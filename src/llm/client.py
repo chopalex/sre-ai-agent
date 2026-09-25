@@ -53,6 +53,8 @@ class OpenAICompatibleClient(BaseLLMClient):
                     }
                     for tc in m.tool_calls
                 ]
+            if m.tool_call_id:
+                msg_dict["tool_call_id"] = m.tool_call_id
             if m.name:
                 msg_dict["name"] = m.name
             payload_messages.append(msg_dict)
@@ -330,20 +332,22 @@ class MockLLMClient(BaseLLMClient):
                 duration_ms=5.0,
             )
         else:
-            # Default direct diagnostic
+            # Non-SRE / Off-topic query in Mock mode
             return LLMResponse(
-                content="Выполняю проверку состояния системы.",
-                tool_calls=[
-                    ToolCall(
-                        id="mock_tc_default",
-                        name="system_diagnostic",
-                        arguments={"target": "disk"},
-                    )
-                ],
+                content=(
+                    f"Запрос «{user_text}» не относится к задачам SRE-инженера и регламентам эксплуатации.\n\n"
+                    "**Внимание:** В данный момент агент запущен в демонстрационном режиме **`LLM_PROVIDER=mock`** "
+                    "(локальная заглушка для мгновенных юнит-тестов без обращения к внешним API).\n\n"
+                    "Чтобы подключить реальную модель нейросети через OpenRouter:\n"
+                    "1. В файле `.env` укажите: `LLM_PROVIDER=openrouter`\n"
+                    "2. Проверьте ваш API-ключ в строке: `OPENAI_API_KEY=sk-or-v1-...`\n"
+                    "3. Запустите самодиагностику: `python -m src.cli --check`"
+                ),
+                tool_calls=[],
                 model=self.model,
-                duration_ms=5.0,
-                prompt_tokens=80,
-                completion_tokens=20,
+                duration_ms=1.0,
+                prompt_tokens=15,
+                completion_tokens=40,
             )
 
 

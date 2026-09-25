@@ -45,6 +45,7 @@ class AgentLoop:
         total_completion_tokens = 0
         final_answer = ""
         current_step = 1
+        last_model = getattr(self.llm, "model", "unknown")
 
         while current_step <= self.max_steps:
             step_start = time.perf_counter()
@@ -54,6 +55,7 @@ class AgentLoop:
                 messages=messages,
                 tools=self.tools_schema,
             )
+            last_model = llm_resp.model
 
             total_prompt_tokens += llm_resp.prompt_tokens
             total_completion_tokens += llm_resp.completion_tokens
@@ -179,6 +181,7 @@ class AgentLoop:
                     ChatMessage(
                         role="tool",
                         name=tool_name,
+                        tool_call_id=tc.id,
                         content=tool_obs_content,
                     )
                 )
@@ -204,6 +207,8 @@ class AgentLoop:
             steps=steps,
             citations=citations,
             success=True,
+            llm_model=last_model,
+            llm_provider=type(self.llm).__name__,
             total_duration_ms=total_elapsed_ms,
             total_prompt_tokens=total_prompt_tokens,
             total_completion_tokens=total_completion_tokens,
