@@ -1,0 +1,18 @@
+# ==============================================================================
+# GPU Override for NVIDIA CUDA acceleration
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+# ==============================================================================
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+        limits:
+          memory: 8192M
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
